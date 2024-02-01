@@ -1,6 +1,4 @@
-import undetected_chromedriver as uc
-from auto_download_undetected_chromedriver import download_undetected_chromedriver
-import chromedriver_autoinstaller
+import json
 import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -30,7 +28,6 @@ class MopsTwseHandler():
             return options
         self.browser_executable_path = ""
         
-        print(self.browser_executable_path)
         #download_undetected_chromedriver(self.browser_executable_path, undetected=True, arm=False, force_update=True, dowloadurl=r'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/116.0.5844.0/win64/chromedriver-win64.zip')
         #chromedriver_autoinstaller.install()
         
@@ -44,7 +41,6 @@ class MopsTwseHandler():
         self.year = eval(time_start.strftime("%Y") + "- 1911")
         self.month = time_start.strftime("%m")
         self.day = time_start.strftime("%d")
-        print(self.year, self.month, self.day)
         
         self.driver.get("https://mops.twse.com.tw/mops/web/t05st02")
     
@@ -63,8 +59,33 @@ class MopsTwseHandler():
         search_button.click()
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//th[text()='發言日期']")))
         info_list = self.driver.find_elements(By.XPATH, "//div[@id='table01']/table[3]/tbody/tr")
+        full_output_list = []
+        
         for i in info_list:
-            print(i.text)
+            if i.text == "發言日期 發言時間 公司代號 公司名稱 主旨":
+                info_list.remove(i)
+        for i in range(0, len(info_list)):
+            info = info_list[i]
+            def get_details():
+                print(info.get_attribute("outerHTML"))
+                #more_info_button = i.find_element(By.XPATH, "./td/form/input[@value='詳細資料']")
+                
+            output = {}
+            splited_info = info.text.replace("\n", "").replace("  ", " ").split(" ")
+
+            try:
+                output.update({"發言日期": splited_info[1]})
+                output.update({"發言時間": splited_info[2]})
+                output.update({"公司代號": splited_info[3]})
+                output.update({"公司名稱": splited_info[4]})
+                output.update({"主旨": splited_info[5]})
+                output.update({"詳細資料": ""})
+                full_output_list.append(output)
+            except:
+                continue
+        for i in full_output_list:
+            print(i)
+
 
 mops_twse_handler = MopsTwseHandler()
 mops_twse_handler.get_today_info()
