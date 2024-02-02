@@ -1,5 +1,6 @@
 import json
 import os
+import pymysql
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -28,11 +29,7 @@ class MopsTwseHandler():
             return options
         self.browser_executable_path = ""
         
-        #download_undetected_chromedriver(self.browser_executable_path, undetected=True, arm=False, force_update=True, dowloadurl=r'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/116.0.5844.0/win64/chromedriver-win64.zip')
-        #chromedriver_autoinstaller.install()
-        
         self.browser_executable_path = os.path.abspath("chromedriver.exe")
-        #self.driver = uc.Chrome(options=get_ChromeOptions(), version_main=110, use_subprocess=True)
         self.driver = Driver(uc=True)
         
         self.wait = WebDriverWait(self.driver, 10, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
@@ -44,7 +41,10 @@ class MopsTwseHandler():
         
         self.driver.get("https://mops.twse.com.tw/mops/web/t05st02")
     
-    def get_today_info(self):
+    def get_today_info_list(self):
+        '''
+        抓取本日於 https://mops.twse.com.tw/mops/web/t05st02 上公告的資訊，並以列表形式回傳。
+        '''
         year_input = self.driver.find_element(By.XPATH, "//input[@id='year']")
         year_input.send_keys(self.year)
         
@@ -64,30 +64,45 @@ class MopsTwseHandler():
         for i in info_list:
             if i.text == "發言日期 發言時間 公司代號 公司名稱 主旨":
                 info_list.remove(i)
+                
         for i in range(0, len(info_list)):
             info = info_list[i]
             def get_details():
-                print(info.get_attribute("outerHTML"))
-                #more_info_button = i.find_element(By.XPATH, "./td/form/input[@value='詳細資料']")
-                
+                more_info_button = info.find_elements(By.XPATH, "./td/form/input[@type='hidden']")
+                more_info_button = more_info_button[len(more_info_button) - 1]
+                return more_info_button.get_attribute("value")
             output = {}
             splited_info = info.text.replace("\n", "").replace("  ", " ").split(" ")
+            details = get_details()
 
-            try:
-                output.update({"發言日期": splited_info[1]})
-                output.update({"發言時間": splited_info[2]})
-                output.update({"公司代號": splited_info[3]})
-                output.update({"公司名稱": splited_info[4]})
-                output.update({"主旨": splited_info[5]})
-                output.update({"詳細資料": ""})
-                full_output_list.append(output)
-            except:
-                continue
-        for i in full_output_list:
-            print(i)
+            output.update({"發言日期": splited_info[1]})
+            output.update({"發言時間": splited_info[2]})
+            output.update({"公司代號": splited_info[3]})
+            output.update({"公司名稱": splited_info[4]})
+            output.update({"主旨": splited_info[5]})
+            output.update({"詳細資料": details})
+            full_output_list.append(output)
+            
+        temp_list = []
+        for i in range(0, len(full_output_list)):
+            info = full_output_list[i]
+            today_date = "%s/%s/%s" % (self.year, self.month, self.day)
+            if(info["發言日期"] == today_date):
+                temp_list.append(info)
+        full_output_list = temp_list
+        
+        return full_output_list
 
-
+    def store_to_mysql(self, host, user, password, database, table, info):
+        '''
+        將資料存入 MySQL
+        '''
+        info = self.get_today_info_list()
+        conn = pymysql.connect(host=host, user=user, password=password, database=database)
+        cursor = conn.cursor()
+        cursor.execute("")
+        conn.commit()
 mops_twse_handler = MopsTwseHandler()
-mops_twse_handler.get_today_info()
+mops_twse_handler.store_to_mysql()
         
         
