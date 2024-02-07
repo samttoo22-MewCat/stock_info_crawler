@@ -11,22 +11,7 @@ from datetime import datetime
 
 class MopsTwseHandler():
     def __init__(self) -> None:
-        def get_ChromeOptions(): 
-            options = uc.ChromeOptions()
-            options.add_argument('--start_maximized')
-            options.add_argument("--disable-extensions")
-            options.add_argument('--disable-application-cache')
-            options.add_argument('--disable-gpu')
-            #options.add_argument('--headless') 
-            options.add_argument("--window-size=1920,1080")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-notifications")
-            options.add_argument("--incognito")
-            #user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
-            #options.add_argument(f'user-agent={user_agent}')
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--user-data-dir={}".format(os.path.abspath("profile1")))
-            return options
+        
         self.browser_executable_path = ""
         
         self.browser_executable_path = os.path.abspath("chromedriver.exe")
@@ -62,18 +47,21 @@ class MopsTwseHandler():
         full_output_list = []
         
         for i in info_list:
-            if i.text == "發言日期 發言時間 公司代號 公司名稱 主旨":
+            info = i.get_attribute("textContent").replace("\n", "").replace("  ", " ")
+            if info == "發言日期發言時間公司代號公司名稱主旨":
                 info_list.remove(i)
                 
         for i in range(0, len(info_list)):
             info = info_list[i]
-            def get_details():
-                more_info_button = info.find_elements(By.XPATH, "./td/form/input[@type='hidden']")
-                more_info_button = more_info_button[len(more_info_button) - 1]
-                return more_info_button.get_attribute("value")
+            
             output = {}
             splited_info = info.text.replace("\n", "").replace("  ", " ").split(" ")
-            details = get_details()
+            temp_details = info.find_elements(By.XPATH, ".//input[@type='hidden']")
+            details = ""
+            for d in temp_details:
+                if("1." in d.get_attribute("value")):
+                    details = d.get_attribute("value")
+                    break
 
             output.update({"發言日期": splited_info[1]})
             output.update({"發言時間": splited_info[2]})
@@ -87,22 +75,31 @@ class MopsTwseHandler():
         for i in range(0, len(full_output_list)):
             info = full_output_list[i]
             today_date = "%s/%s/%s" % (self.year, self.month, self.day)
+            #today_date = "113/02/07"
             if(info["發言日期"] == today_date):
                 temp_list.append(info)
         full_output_list = temp_list
-        
+        print("今日公告共 %s 筆" % len(full_output_list))
         return full_output_list
 
     def store_to_mysql(self, host, user, password, database, table, info):
         '''
         將資料存入 MySQL
         '''
-        info = self.get_today_info_list()
-        conn = pymysql.connect(host=host, user=user, password=password, database=database)
+        conn = pymysql.connect(host=host, user=user, password=password, database=database, autocommit=True)
         cursor = conn.cursor()
-        cursor.execute("")
-        conn.commit()
+        for i in info:
+            
+            try:
+                script = "insert into %s (info_date, info_time, company_number, company_name, info_title, info_details) values ('%s', '%s', '%s', '%s', '%s', '%s')" % (table, i["發言日期"], i["發言時間"], i["公司代號"], i["公司名稱"], i["主旨"], i["詳細資料"])
+                cursor.execute(script)
+                print(script)
+            except Exception as e:
+                print(e)
+        
 mops_twse_handler = MopsTwseHandler()
-mops_twse_handler.store_to_mysql()
+info = mops_twse_handler.get_today_info_list()
+
+mops_twse_handler.store_to_mysql(host="127.0.0.1", user="root", password="", database="sys", table="mops_twse", info=info)
         
         
